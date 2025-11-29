@@ -340,13 +340,24 @@ thread_set_priority (int new_priority)
 
 /*  PRIORITY DONATION   */
 
-void donate_priority(struct thread *t) {
-  while(t->waiting_on && t->waiting_on->holder && t->priority > t->waiting_on->holder->priority){
-    t->waiting_on->holder->priority = t->priority;
-    t = t->waiting_on->holder;
+/*  
+  So while a receiver exists and a donor has greater priority than the receiver, boost the receiver to the donor's priority. IF the receiver is also blocked on another lock, move donation up to the next thread in the chain and stop when you reach the top of the chain. 
+*/
+void donate_priority(struct thread *donor, struct thread *receiver) {
+  while(receiver != NULL && donor->priority > receiver->priority){
+    receiver->priority = donor->priority; /*  raise receiver's priority */
+
+  /*  if receiver is waiting on a lock, continue donation up the chain  */
+  if(receiver->waiting_on != NULL)
+    receiver = receiver->waiting_on->holder;
+  else
+    break;
   }
 }
 
+/*  
+  Start by iterating at the head of the current thread's donation list and walk the entire list. Convert the list node 'e' back into thread *t. If t was waiting on the lock that is currently being released, then remove t from the donation list and return the next element that we assign back to e. Otherwise just move e to the next element.
+*/
 void remove_donations_for_lock(struct lock *lock){
   struct list_elem *e = list_begin(&thread_current()->donations);
 
@@ -360,6 +371,9 @@ void remove_donations_for_lock(struct lock *lock){
   }
 }
 
+/*
+  Reset the priority back to its based state and if anyone is currently donating to this thread then assume the donations list is sorted by priority (highest first) and convert the front node back into the donating thread. IF the highest donor has greater priority, raise the thread's priority to match.
+*/
 void recalc_priority(struct thread *t){
   t->priority = t->original_priority;
 

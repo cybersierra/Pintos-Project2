@@ -199,19 +199,22 @@ lock_acquire (struct lock *lock)
   /*  PRIORITY DONATION  */
 
   if(!thread_mlfqs && lock->holder != NULL){
-    struct thread *cur = thread_current();
+    /*  mark the current thread as waiting on this lock and set up possible chain donations */
+    struct thread *cur = thread_current();  
     cur->waiting_on = lock;
 
-    donate_priority(lock->holder);
+      /*  donate the current thrad's priority to the holder (and maybe up the chain)  */
+    donate_priority(thread_current, lock->holder);
 
+    /*  add the current thread to the holder's donation list (sorted by priority) */
     list_insert_ordered(&lock->holder->donations, &cur->donation_elem, donation_compare, NULL);
   }
 
   sema_down (&lock->semaphore);
 
   /*  PRIORITY DONATION */
-  lock->holder = thread_current ();
-  thread_current()->waiting_on = NULL;
+  lock->holder = thread_current (); /*  mark the current thread that now owns the lock  */
+  thread_current()->waiting_on = NULL;  /*  clear the waiting_on  */
 }
 
 /* Tries to acquires LOCK and returns true if successful or false
