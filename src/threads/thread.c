@@ -355,7 +355,7 @@ thread_set_priority (int new_priority)
 bool donation_compare(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED){
   struct thread *ta = list_entry(a, struct thread, donation_elem);
   struct thread *tb = list_entry(b, struct thread, donation_elem);
-  return ta->priority > tb-> priority;
+  return ta->priority > tb->priority;
 }
 
 /*  
