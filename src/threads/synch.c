@@ -50,6 +50,17 @@ sema_init (struct semaphore *sema, unsigned value)
   list_init (&sema->waiters);
 }
 
+/*  PRIORITY DONATION  */
+
+if(!thread_mlfqs && lock->holder != NULL){
+  struct thread *cur = thread_current();
+  cur->waiting_on = lock;
+
+  donate_priority(lock->holder);
+
+  list_insert_ordered(&lock->holder->donations, &cur->donation_elem, donation_compare, NULL);
+}
+
 /* Down or "P" operation on a semaphore.  Waits for SEMA's value
    to become positive and then atomically decrements it.
 
@@ -74,6 +85,9 @@ sema_down (struct semaphore *sema)
   sema->value--;
   intr_set_level (old_level);
 }
+
+thread_current()->waiting_on = NULL;
+lock->holder = thread_current();
 
 /* Down or "P" operation on a semaphore, but only if the
    semaphore is not already 0.  Returns true if the semaphore is
@@ -233,6 +247,10 @@ lock_release (struct lock *lock)
 
   lock->holder = NULL;
   sema_up (&lock->semaphore);
+
+  /*  PRIORITY DONATION   */
+  remove_donations_for_lock(lock);
+  recalc_priority(thread_current());
 }
 
 /* Returns true if the current thread holds LOCK, false

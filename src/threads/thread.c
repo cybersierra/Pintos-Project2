@@ -338,6 +338,39 @@ thread_set_priority (int new_priority)
   return;
 }
 
+/*  PRIORITY DONATION   */
+
+void donate_priority(struct thread *t) {
+  while(t->waiting_on && t->waiting_on->holder && t->priority > t->waiting_on->holder->priority){
+    t->waiting_on->holder->priority = t->priority;
+    t = t->waiting_on->holder;
+  }
+}
+
+void remove_donations_for_lock(struct lock *lock){
+  struct list_elem *e = list_begin(&thread_current()->donations);
+
+  while(e != list_end(&thread_current()->donations)){
+    struct thread *t = list_entry(e, struct thread, donation_elem);
+
+    if(t->waiting_on == lock)
+      e = list_remove(e);
+    else
+      e = list_next(e);
+  }
+}
+
+void recalc_priority(struct thread *t){
+  t->priority = t->original_priority;
+
+  if(!list_empty(&t->donations)){
+    struct thread *top = list_entry(list_front(&t->donations), struct thread, donation_elem);
+    
+    if(top->priority > t->priority)
+      t->priority = top->priority;
+  }
+}
+
 /* Returns the current thread's priority. */
 int
 thread_get_priority (void) 
@@ -462,6 +495,12 @@ init_thread (struct thread *t, const char *name, int priority)
   strlcpy (t->name, name, sizeof t->name);
   t->stack = (uint8_t *) t + PGSIZE;
   t->priority = priority;
+
+  /* PRIORITY DONATION */
+  t->original_priority = priority;  /* saves the original priority */
+  list_init(&t->donations); /* holds a list of what threads have donated */
+  t->waiting_on = NULL; /* tracks which lock the thread is waiting on */
+
   t->magic = THREAD_MAGIC;
 
   old_level = intr_disable ();
@@ -583,6 +622,8 @@ allocate_tid (void)
    Used by switch.S, which can't figure it out on its own. */
 uint32_t thread_stack_ofs = offsetof (struct thread, stack);
 
+/*  PRIORITY DONATION */
+
 /* parameters:
       list_elem *a = first element to be compared, I think it points to the previous item 
       list_elem *b = second element to be compared, I think it points to the next item 
@@ -595,6 +636,6 @@ uint32_t thread_stack_ofs = offsetof (struct thread, stack);
 bool donation_compare(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED){
   struct thread *ta = list_entry(a, struct thread, donation_elem);
   struct thread *tb = list_entry(b, struct thread, donation_elem);
-  return ta -> priority > tb -> priority
+  return ta->priority > tb-> priority;
 }
 
