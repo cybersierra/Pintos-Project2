@@ -582,3 +582,19 @@ allocate_tid (void)
 /* Offset of `stack' member within `struct thread'.
    Used by switch.S, which can't figure it out on its own. */
 uint32_t thread_stack_ofs = offsetof (struct thread, stack);
+
+/* parameters:
+      list_elem *a = first element to be compared, I think it points to the previous item 
+      list_elem *b = second element to be compared, I think it points to the next item 
+      *aux UNUSED = optional extra argument for the comparator 
+   
+   function:
+      We declare pointers to the threads that contain list entries a and b. This gives us pointers to two threads.
+      We then look at the priorities of each thread and compare them. The function will return true if ta's priority is greater than tb's priority.
+*/
+bool donation_compare(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED){
+  struct thread *ta = list_entry(a, struct thread, donation_elem);
+  struct thread *tb = list_entry(b, struct thread, donation_elem);
+  return ta -> priority > tb -> priority
+}
+

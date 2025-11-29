@@ -107,6 +107,12 @@ struct thread
    Controlled by kernel command-line option "-o mlfqs". */
 extern bool thread_mlfqs;
 
+/*int priority;   effective priority */
+int original_priority;  /* base priority */
+struct list donations;  /* list of threads that donated */
+struct lock *waiting_on;   /* lock that this thread is currently waiting for */
+struct list_elem donation_elem; /* used when placing in someone's donation list */
+
 void thread_init (void);
 void thread_start (void);
 
