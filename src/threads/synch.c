@@ -204,7 +204,7 @@ lock_acquire (struct lock *lock)
     cur->waiting_on = lock;
 
       /*  donate the current thrad's priority to the holder (and maybe up the chain)  */
-    donate_priority(thread_current, lock->holder);
+    donate_priority(thread_current(), lock->holder);
 
     /*  add the current thread to the holder's donation list (sorted by priority) */
     list_insert_ordered(&lock->holder->donations, &cur->donation_elem, donation_compare, NULL);

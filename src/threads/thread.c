@@ -15,6 +15,8 @@
 #include "userprog/process.h"
 #endif
 
+/* COMMENT */
+
 /* Random value for struct thread's `magic' member.
    Used to detect stack overflow.  See the big comment at the top
    of thread.h for details. */
@@ -338,7 +340,23 @@ thread_set_priority (int new_priority)
   return;
 }
 
+
 /*  PRIORITY DONATION   */
+
+/* parameters:
+      list_elem *a = first element to be compared, I think it points to the previous item 
+      list_elem *b = second element to be compared, I think it points to the next item 
+      *aux UNUSED = optional extra argument for the comparator 
+   
+   function:
+      We declare pointers to the threads that contain list entries a and b. This gives us pointers to two threads.
+      We then look at the priorities of each thread and compare them. The function will return true if ta's priority is greater than tb's priority.
+*/
+bool donation_compare(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED){
+  struct thread *ta = list_entry(a, struct thread, donation_elem);
+  struct thread *tb = list_entry(b, struct thread, donation_elem);
+  return ta->priority > tb-> priority;
+}
 
 /*  
   So while a receiver exists and a donor has greater priority than the receiver, boost the receiver to the donor's priority. IF the receiver is also blocked on another lock, move donation up to the next thread in the chain and stop when you reach the top of the chain. 
@@ -636,20 +654,5 @@ allocate_tid (void)
    Used by switch.S, which can't figure it out on its own. */
 uint32_t thread_stack_ofs = offsetof (struct thread, stack);
 
-/*  PRIORITY DONATION */
 
-/* parameters:
-      list_elem *a = first element to be compared, I think it points to the previous item 
-      list_elem *b = second element to be compared, I think it points to the next item 
-      *aux UNUSED = optional extra argument for the comparator 
-   
-   function:
-      We declare pointers to the threads that contain list entries a and b. This gives us pointers to two threads.
-      We then look at the priorities of each thread and compare them. The function will return true if ta's priority is greater than tb's priority.
-*/
-bool donation_compare(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED){
-  struct thread *ta = list_entry(a, struct thread, donation_elem);
-  struct thread *tb = list_entry(b, struct thread, donation_elem);
-  return ta->priority > tb-> priority;
-}
 
