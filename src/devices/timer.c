@@ -34,15 +34,6 @@ static void real_time_delay (int64_t num, int32_t denom);
 /* List of sleeping threads (ordered by wakeup_tick). */
 static struct list sleep_list;
 
-static bool
-wakeup_less (const struct list_elem *a,
-             const struct list_elem *b,
-             void *aux UNUSED)
-{
-  const struct thread *ta = list_entry (a, struct thread, elem);
-  const struct thread *tb = list_entry (b, struct thread, elem);
-  return ta->wakeup_tick < tb->wakeup_tick;
-}
 /* Sets up the timer to interrupt TIMER_FREQ times per second,
    and registers the corresponding interrupt. */
 void
