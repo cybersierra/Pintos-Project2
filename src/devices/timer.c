@@ -34,11 +34,15 @@ static void real_time_delay (int64_t num, int32_t denom);
 /* List of sleeping threads (ordered by wakeup_tick). */
 static struct list sleep_list;
 
-/* Compare two threads by wakeup_tick (earlier first). */
-static bool wakeup_less (const struct list_elem *a,
-                         const struct list_elem *b,
-                         void *aux UNUSED);
-
+static bool
+wakeup_less (const struct list_elem *a,
+             const struct list_elem *b,
+             void *aux UNUSED)
+{
+  const struct thread *ta = list_entry (a, struct thread, elem);
+  const struct thread *tb = list_entry (b, struct thread, elem);
+  return ta->wakeup_tick < tb->wakeup_tick;
+}
 /* Sets up the timer to interrupt TIMER_FREQ times per second,
    and registers the corresponding interrupt. */
 void
@@ -99,29 +103,27 @@ timer_elapsed (int64_t then)
 /* Sleeps for approximately TICKS timer ticks.  Interrupts must
    be turned on. */
 void
-timer_sleep (int64_t ticks_to_sleep) 
+timer_sleep (int64_t ticks) 
 {
-  if (ticks_to_sleep <= 0)
+  if (ticks <= 0)
     return;
 
   ASSERT (intr_get_level () == INTR_ON);
 
-  int64_t wake_tick = timer_ticks () + ticks_to_sleep;
   enum intr_level old_level = intr_disable ();
 
+  int64_t wake = timer_ticks () + ticks;
   struct thread *cur = thread_current ();
-  cur->wakeup_tick = wake_tick;
+  cur->wakeup_tick = wake;
 
-  /* Insert into sleep_list ordered by wakeup_tick (earliest first). */
-  list_insert_ordered (&sleep_list, &cur->sleep_elem,
-                       wakeup_less, NULL);
+  /* Insert current thread into sleep_list ordered by wakeup_tick. */
+  list_insert_ordered (&sleep_list, &cur->elem, wakeup_less, NULL);
 
-  /* Block this thread until someone unblocks it in timer_interrupt. */
+  /* Block this thread until someone wakes it. */
   thread_block ();
 
   intr_set_level (old_level);
 }
-
 /* Sleeps for approximately MS milliseconds.  Interrupts must be
    turned on. */
 void
@@ -199,27 +201,21 @@ timer_interrupt (struct intr_frame *args UNUSED)
 {
   ticks++;
 
-  /* Wake any threads whose time has come. */
+  /* Wake up any sleeping threads whose time has come. */
   while (!list_empty (&sleep_list)) 
     {
-      struct thread *t =
-        list_entry (list_front (&sleep_list), struct thread, sleep_elem);
+      struct list_elem *e = list_front (&sleep_list);
+      struct thread *t = list_entry (e, struct thread, elem);
 
-      if (t->wakeup_tick <= ticks) 
-        {
-          list_pop_front (&sleep_list);
-          thread_unblock (t);
-        }
-      else
-        {
-          /* List is ordered, so if the first isn't ready, none are. */
-          break;
-        }
+      if (t->wakeup_tick > ticks)
+        break;   /* The earliest one hasn’t reached its time yet. */
+
+      list_pop_front (&sleep_list);
+      thread_unblock (t);
     }
 
   thread_tick ();
 }
-
 /* Returns true if LOOPS iterations waits for more than one timer
    tick, otherwise false. */
 static bool
