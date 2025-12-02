@@ -108,7 +108,8 @@ timer_sleep (int64_t ticks)
   cur->wakeup_tick = wake;
 
   /* Insert current thread into sleep_list ordered by wakeup_tick. */
-  list_insert_ordered (&sleep_list, &cur->elem, wakeup_less, NULL);
+  list_insert_ordered (&sleep_list, &cur->sleep_elem, wakeup_less, NULL);
+
 
   /* Block this thread until someone wakes it. */
   thread_block ();
@@ -196,7 +197,7 @@ timer_interrupt (struct intr_frame *args UNUSED)
   while (!list_empty (&sleep_list)) 
     {
       struct list_elem *e = list_front (&sleep_list);
-      struct thread *t = list_entry (e, struct thread, elem);
+      struct thread *t = list_entry (e, struct thread, sleep_elem);
 
       if (t->wakeup_tick > ticks)
         break;   /* The earliest one hasn’t reached its time yet. */
