@@ -224,7 +224,7 @@ lock_acquire (struct lock *lock)
 
   struct thread *cur = thread_current ();
 
-  if (lock->holder != NULL) {
+  if (!thread_mlfqs && lock->holder != NULL && lock->holder != cur) {
     /* Record what we’re waiting on. */
     cur->waiting_on = lock;
 
