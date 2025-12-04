@@ -192,7 +192,6 @@ static void
 timer_interrupt (struct intr_frame *args UNUSED)
 {
   ticks++;
-  thread_tick();
 
   /* Wake up any sleeping threads whose time has come. */
   while (!list_empty (&sleep_list)) 
