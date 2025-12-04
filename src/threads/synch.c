@@ -215,7 +215,8 @@ lock_init (struct lock *lock)
    interrupt handler.  This function may be called with
    interrupts disabled, but interrupts will be turned back on if
    we need to sleep. */
-void
+
+   void
 lock_acquire (struct lock *lock)
 {
   ASSERT (lock != NULL);
@@ -223,16 +224,16 @@ lock_acquire (struct lock *lock)
   ASSERT (!lock_held_by_current_thread (lock));
 
   struct thread *cur = thread_current ();
-
+  /*
   if (!thread_mlfqs && lock->holder != NULL && lock->holder != cur) {
-    /* Record what we’re waiting on. */
+    // Record what we’re waiting on.
     cur->waiting_on = lock;
 
-    /* Donate to the holder and propagate up to a bounded depth. */
+    // Donate to the holder and propagate up to a bounded depth. 
     struct thread *h = lock->holder;
     int depth = 0;
     while (h != NULL && depth < 8) {
-      /* Insert/keep current in h->donations ordered by priority. */
+      // Insert/keep current in h->donations ordered by priority. 
       bool already = false;
       struct list_elem *e;
       for (e = list_begin (&h->donations); e != list_end (&h->donations); e = list_next (e)) {
@@ -242,11 +243,11 @@ lock_acquire (struct lock *lock)
       if (!already)
         list_insert_ordered (&h->donations, &cur->donation_elem, thread_donation_higher, NULL);
 
-      /* Recompute holder’s effective priority. */
+      // Recompute holder’s effective priority.
       thread_update_priority (h);
       thread_ready_reinsert(h);
 
-      /* Chain donation if holder is itself waiting on another lock. */
+      // Chain donation if holder is itself waiting on another lock.
       if (h->waiting_on != NULL)
         h = h->waiting_on->holder;
       else
@@ -255,7 +256,7 @@ lock_acquire (struct lock *lock)
       depth++;
     }
   }
-
+  */
   /* Sleep until the lock is available. */
   sema_down (&lock->semaphore);
 
@@ -296,8 +297,8 @@ lock_release (struct lock *lock)
   ASSERT (lock_held_by_current_thread (lock));
 
   struct thread *cur = thread_current ();
-
-  /* Remove donations that were waiting on this lock. */
+  /*
+  // Remove donations that were waiting on this lock.
   struct list_elem *e = list_begin (&cur->donations);
   while (e != list_end (&cur->donations)) {
     struct thread *d = list_entry (e, struct thread, donation_elem);
@@ -307,9 +308,9 @@ lock_release (struct lock *lock)
     e = next;
   }
 
-  /* Recompute our effective priority after dropping these donations. */
+  // Recompute our effective priority after dropping these donations.
   thread_update_priority (cur);
-
+  */
   lock->holder = NULL;
   sema_up (&lock->semaphore);
 }

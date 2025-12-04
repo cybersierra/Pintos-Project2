@@ -111,7 +111,6 @@ timer_sleep (int64_t ticks)
   /* Insert current thread into sleep_list ordered by wakeup_tick. */
   list_insert_ordered (&sleep_list, &cur->sleep_elem, wakeup_less, NULL);
 
-
   /* Block this thread until someone wakes it. */
   thread_block ();
 
