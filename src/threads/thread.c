@@ -242,13 +242,8 @@ thread_create (const char *name, int priority,
   /* Add to run queue. */
   thread_unblock (t);
 
-  /*
-  // Added 
-  if (t->priority > thread_current ()->priority) {
-    thread_yield (); }
-
   return tid;
-  */
+  
 }
 
 /* Puts the current thread to sleep.  It will not be scheduled

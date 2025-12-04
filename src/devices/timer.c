@@ -105,19 +105,17 @@ timer_sleep (int64_t sleep_ticks)
 
   ASSERT (intr_get_level () == INTR_ON);
 
+  /* Get wake time while interrupts are ON. */
+  int64_t wake = timer_ticks () + sleep_ticks;
+
   enum intr_level old_level = intr_disable ();
-
-  struct thread *cur = thread_current();
-
-  int64_t wake = ticks + sleep_ticks;
+  struct thread *cur = thread_current ();
 
   cur->wakeup_tick = wake;
 
-  printf("DEBUG: %s sleeping until %lld (now %lld)\n", cur->name, wake, timer_ticks());
-
   /* Insert current thread into sleep_list ordered by wakeup_tick. */
-  list_insert_ordered (&sleep_list, &cur->sleep_elem, wakeup_less, NULL);
-
+  list_insert_ordered (&sleep_list, &cur->sleep_elem,
+                       wakeup_less, NULL);
 
   /* Block this thread until someone wakes it. */
   thread_block ();
@@ -202,18 +200,7 @@ timer_interrupt (struct intr_frame *args UNUSED)
   ticks++;
 
   /* Wake up any sleeping threads whose time has come. */
-  while (!list_empty (&sleep_list)) 
-    {
-      struct list_elem *e = list_front (&sleep_list);
-      struct thread *t = list_entry (e, struct thread, sleep_elem);
-
-      if (t->wakeup_tick > ticks)
-        break;   /* The earliest one hasn’t reached its time yet. */
-
-      list_pop_front (&sleep_list);
-      printf("DEBUG: waking %s at tick %%lld\n", t->name, ticks);
-      thread_unblock (t);
-    }
+  wake_sleeping_threads ();
 
   thread_tick ();
 }
@@ -287,6 +274,25 @@ real_time_delay (int64_t num, int32_t denom)
   ASSERT (denom % 1000 == 0);
   busy_wait (loops_per_tick * num / 1000 * TIMER_FREQ / (denom / 1000)); 
 }
+
+static void
+wake_sleeping_threads (void)
+{
+  int64_t now = ticks;
+
+  while (!list_empty (&sleep_list))
+    {
+      struct list_elem *e = list_front (&sleep_list);
+      struct thread *t = list_entry (e, struct thread, sleep_elem);
+
+      if (t->wakeup_tick > now)
+        break;  /* Earliest sleeper is still in the future. */
+
+      list_pop_front (&sleep_list);
+      thread_unblock (t);
+    }
+}
+
 /* Compare two threads by wakeup_tick (earlier wakeup first). */
 static bool
 wakeup_less (const struct list_elem *a,
