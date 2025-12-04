@@ -145,7 +145,7 @@ sema_up (struct semaphore *sema)
 
   if (need_preempt)
     { 
-      if (intr_context ())
+      if (int_context ())
        intr_yield_on_return ();
       else
         thread_yield ();
