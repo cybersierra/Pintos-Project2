@@ -74,7 +74,6 @@ static void schedule (void);
 void thread_schedule_tail (struct thread *prev);
 static tid_t allocate_tid (void);
 
-#if 0
 /* Higher number, higher priority (Added) */
 bool
 thread_priority_higher (const struct list_elem *a, const struct list_elem *b, void *aux UNUSED) {
@@ -82,7 +81,7 @@ thread_priority_higher (const struct list_elem *a, const struct list_elem *b, vo
   const struct thread *tb = list_entry (b, struct thread, elem);
   return ta->priority > tb->priority; 
 }
-#endif
+
 
 /* Order a thread’s donors by effective priority (higher first). */
 bool
@@ -288,20 +287,17 @@ thread_unblock (struct thread *t)
   t->status = THREAD_READY;
   intr_set_level (old_level);
 
-  /*
+  
   // Put T into ready_list in priority order (highest first).
   list_insert_ordered (&ready_list, &t->elem, thread_priority_higher, NULL);
   t->status = THREAD_READY;
 
   // Decide about preemption AFTER we re-enable interrupts.
-  bool preempt = (t->priority > thread_current ()->priority);
   intr_set_level (old_level);
 
-  if (preempt) {
-    if (intr_context()) intr_yield_on_return();
-    else thread_yield();
-  }
-  */
+  if (!intr_context() && t->priority > thread_current()->priority)
+    thread_yield();
+
 }
 
 /* Returns the name of the running thread. */
