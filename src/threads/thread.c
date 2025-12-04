@@ -242,11 +242,13 @@ thread_create (const char *name, int priority,
   /* Add to run queue. */
   thread_unblock (t);
 
-  /* Added */
+  /*
+  // Added 
   if (t->priority > thread_current ()->priority) {
     thread_yield (); }
 
   return tid;
+  */
 }
 
 /* Puts the current thread to sleep.  It will not be scheduled
@@ -283,11 +285,11 @@ thread_unblock (struct thread *t)
   old_level = intr_disable ();
   ASSERT (t->status == THREAD_BLOCKED);
 
-  list_push_back (&ready_list,&t->elem);
+  list_push_back (&ready_list, &t->elem);
   t->status = THREAD_READY;
   intr_set_level (old_level);
 
-  
+  /*
   // Put T into ready_list in priority order (highest first).
   list_insert_ordered (&ready_list, &t->elem, thread_priority_higher, NULL);
   t->status = THREAD_READY;
@@ -297,7 +299,7 @@ thread_unblock (struct thread *t)
 
   if (!intr_context() && t->priority > thread_current()->priority)
     thread_yield();
-
+  */
 }
 
 /* Returns the name of the running thread. */
