@@ -68,16 +68,20 @@ that tick.
 >> A4: How are race conditions avoided when multiple threads call
 >> timer_sleep() simultaneously?
 
-
-
+In timer_sleep(), the it disables interrupts before computing the wake-up tick, insert sleep_elem into sleep_list, and call thread_block(). After the thread has been blocked the list operations can be completed and the previous interrupt level is restored. timer_interrupt() also runs with interrupts disabled by default. It also traverses and
+modifies sleep_list only when waking threads. Due to Pintos being a single-CPU, disabling interrupts prevents the timer interupt from preempting timer_sleep() in the middle of changing sleep_list. It also prevents anything else from changing the list at the same time. We cannnot use a lock to protect sleep_list because it may cause the caller to sleep and may not be used safely in interrupt context.
 
 >> A5: How are race conditions avoided when a timer interrupt occurs
 >> during a call to timer_sleep()?
+
+Race conditions can be avoided when a timer interrupt happens by disabling interrupts. Using timer_sleep() the thread is able to disable interrupts before computing the wake_up tick which creates its sleep_elem. After the sleep_elem is inserted into sleep_list and calls thread_block(). Due to interrupts being disabled during this, the timer interrupt cannot happen in the middle of this operation. The interrupts are then enabled after thread_block().
 
 ---- RATIONALE ----
 
 >> A6: Why did you choose this design?  In what ways is it superior to
 >> another design you considered?
+
+By using a sorted sleep list with blocking all the big work is integrated into timer_sleep(). This keeps the timer interrupt handler to work quicker and maintain an ordered sleep_list the allowed the handler to only have to look at the front of the list. This design also avoid busy waiting by blockinng threads while sleeping and avoids consuming CPU time. All sorting and calculationns are done within the thread context and the interrupt handler only preforms removals and thread_unblock() calls. This design is superior because it involves the handler to not have to scan all the threads.
 
 			 PRIORITY SCHEDULING
 			 ===================
@@ -87,6 +91,7 @@ that tick.
 >> B1: Copy here the declaration of each new or changed `struct' or
 >> `struct' member, global or static variable, `typedef', or
 >> enumeration.  Identify the purpose of each in 25 words or less.
+
 
 >> B2: Explain the data structure used to track priority donation.
 >> Use ASCII art to diagram a nested donation.  (Alternately, submit a
