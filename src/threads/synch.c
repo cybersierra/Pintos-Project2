@@ -74,6 +74,7 @@ sema_down (struct semaphore *sema)
   old_level = intr_disable ();
   while (sema->value == 0)
     {
+      printf("DEBUG: %s blocking on sema %p\n", thread_current()->name, sema);
       list_insert_ordered (&sema->waiters,
                            &thread_current ()->elem,
                            thread_priority_higher, NULL);
@@ -118,6 +119,7 @@ sema_up (struct semaphore *sema)
 {
   enum intr_level old_level;
   struct thread *unblocked = NULL;
+  printf("DEBUG: sema_up %p waking %s\n", sema, unblocked->name);
   bool need_preempt = false;
 
   ASSERT (sema != NULL);
@@ -324,7 +326,7 @@ lock_held_by_current_thread (const struct lock *lock)
 
   return lock->holder == thread_current ();
 }
-
+
 /* One semaphore in a list. */
 struct semaphore_elem 
   {
@@ -341,6 +343,12 @@ cond_sema_higher (const struct list_elem *a,
 {
   struct semaphore_elem *sa = list_entry (a, struct semaphore_elem, elem);
   struct semaphore_elem *sb = list_entry (b, struct semaphore_elem, elem);
+
+  /* If either semaphore has no waiters yet, treat it as lowest priority. */
+  if (list_empty (&sa->semaphore.waiters))
+    return false;
+  if (list_empty (&sb->semaphore.waiters))
+    return false;
 
   struct thread *ta = list_entry (list_front (&sa->semaphore.waiters),
                                   struct thread, elem);
@@ -384,6 +392,10 @@ cond_init (struct condition *cond)
 void
 cond_wait (struct condition *cond, struct lock *lock) 
 {
+  printf("DEBUG: cond_wait enqueue, cond=%p, lock=%p, thread=%s\n",
+       cond, lock, thread_current()->name);
+
+  
   struct semaphore_elem waiter;
 
   ASSERT (cond != NULL);
@@ -392,8 +404,9 @@ cond_wait (struct condition *cond, struct lock *lock)
 
   sema_init (&waiter.semaphore, 0);
 
-  /* Insert waiter into cond->waiters by priority (highest first). */
-  list_insert_ordered (&cond->waiters, &waiter.elem, cond_sema_higher, NULL);
+  /* Enqueue this waiter; cond_signal will sort by priority later. */
+  list_push_back (&cond->waiters, &waiter.elem);
+
 
   lock_release (lock);
   sema_down (&waiter.semaphore);

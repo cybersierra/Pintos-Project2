@@ -89,6 +89,11 @@ timer_elapsed (int64_t then)
   return timer_ticks () - then;
 }
 
+/* Function prototype so that wakeup_less works in the timer_sleep function */
+static bool wakeup_less (const struct list_elem *a,
+                         const struct list_elem *b,
+                         void *aux UNUSED);
+
 /* Sleeps for approximately TICKS timer ticks.  Interrupts must
    be turned on. */
 /* Sleeps for approximately TICKS timer ticks.  Interrupts must
