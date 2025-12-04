@@ -192,12 +192,13 @@ static void
 timer_interrupt (struct intr_frame *args UNUSED)
 {
   ticks++;
+  thread_tick();
 
   /* Wake up any sleeping threads whose time has come. */
   while (!list_empty (&sleep_list)) 
     {
-      struct list_elem *e = list_front (&sleep_list);
-      struct thread *t = list_entry (e, struct thread, sleep_elem);
+      //struct list_elem *e = list_front (&sleep_list);
+      struct thread *t = list_entry (list_front(&sleep_list), struct thread, sleep_elem);
 
       if (t->wakeup_tick > ticks)
         break;   /* The earliest one hasn’t reached its time yet. */
@@ -290,5 +291,5 @@ wakeup_less (const struct list_elem *a,
   if(t_a->wakeup_tick != t_b->wakeup_tick)
     return t_a->wakeup_tick < t_b->wakeup_tick;
 
-  return t_a->priority < t_b->priority;
+  return t_a->priority > t_b->priority;
 }
