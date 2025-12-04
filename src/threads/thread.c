@@ -72,6 +72,7 @@ static void schedule (void);
 void thread_schedule_tail (struct thread *prev);
 static tid_t allocate_tid (void);
 
+#if 0
 /* Higher number, higher priority (Added) */
 bool
 thread_priority_higher (const struct list_elem *a, const struct list_elem *b, void *aux UNUSED) {
@@ -79,6 +80,7 @@ thread_priority_higher (const struct list_elem *a, const struct list_elem *b, vo
   const struct thread *tb = list_entry (b, struct thread, elem);
   return ta->priority > tb->priority; 
 }
+#endif
 
 /* Order a thread’s donors by effective priority (higher first). */
 bool
@@ -360,7 +362,8 @@ thread_yield (void)
 
   old_level = intr_disable ();
   if (cur != idle_thread) 
-    list_insert_ordered (&ready_list, &cur->elem, thread_priority_higher, NULL);
+    list_push_back (&ready_list, &cur->elem);
+    // list_insert_ordered (&ready_list, &cur->elem, thread_priority_higher, NULL);
   cur->status = THREAD_READY;
   schedule ();
   intr_set_level (old_level);
