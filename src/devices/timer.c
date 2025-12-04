@@ -30,10 +30,13 @@ static bool too_many_loops (unsigned loops);
 static void busy_wait (int64_t loops);
 static void real_time_sleep (int64_t num, int32_t denom);
 static void real_time_delay (int64_t num, int32_t denom);
-static bool wakeup_less (const struct list_elem *a, const struct list_elem *b, void *aux);
 
 /* List of sleeping threads (ordered by wakeup_tick). */
 static struct list sleep_list;
+
+// helpers for sleeping threads
+static void wake_sleeping_threads (void);
+static bool wakeup_less (const struct list_elem *a, const struct list_elem *b, void *aux UNUSED);
 
 /* Sets up the timer to interrupt TIMER_FREQ times per second,
    and registers the corresponding interrupt. */
@@ -95,17 +98,19 @@ timer_elapsed (int64_t then)
 /* Sleeps for approximately TICKS timer ticks.  Interrupts must
    be turned on. */
 void
-timer_sleep (int64_t ticks) 
+timer_sleep (int64_t sleep_ticks) 
 {
-  if (ticks <= 0)
+  if (sleep_ticks <= 0)
     return;
 
   ASSERT (intr_get_level () == INTR_ON);
 
   enum intr_level old_level = intr_disable ();
 
-  int64_t wake = timer_ticks () + ticks;
-  struct thread *cur = thread_current ();
+  struct thread *cur = thread_current();
+
+  int64_t wake = ticks + sleep_ticks;
+
   cur->wakeup_tick = wake;
 
   printf("DEBUG: %s sleeping until %lld (now %lld)\n", cur->name, wake, timer_ticks());
