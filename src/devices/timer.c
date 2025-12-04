@@ -284,7 +284,11 @@ wakeup_less (const struct list_elem *a,
              const struct list_elem *b,
              void *aux UNUSED)
 {
-  const struct thread *ta = list_entry (a, struct thread, sleep_elem);
-  const struct thread *tb = list_entry (b, struct thread, sleep_elem);
-  return ta->wakeup_tick < tb->wakeup_tick;
+  const struct thread *t_a = list_entry (a, struct thread, sleep_elem);
+  const struct thread *t_b = list_entry (b, struct thread, sleep_elem);
+
+  if(t_a->wakeup_tick != t_b->wakeup_tick)
+    return t_a->wakeup_tick < t_b->wakeup_tick;
+
+  return t_a->priority < t_b->priority;
 }
