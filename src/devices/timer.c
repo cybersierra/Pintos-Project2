@@ -31,7 +31,6 @@ static void busy_wait (int64_t loops);
 static void real_time_sleep (int64_t num, int32_t denom);
 static void real_time_delay (int64_t num, int32_t denom);
 static bool wakeup_less(const struct list_elem *a, const struct list_elem *b, void *aux);
-static struct list sleep_list;
 
 /* List of sleeping threads (ordered by wakeup_tick). */
 static struct list sleep_list;
@@ -102,13 +101,12 @@ timer_sleep (int64_t ticks)
     return;
 
   ASSERT (intr_get_level () == INTR_ON);
-  //ASSERT (!intr_context ());
 
   enum intr_level old_level = intr_disable ();
 
-  //int64_t wake = timer_ticks () + ticks;
+  int64_t wake = timer_ticks () + ticks;
   struct thread *cur = thread_current ();
-  cur->wakeup_tick = timer_ticks () + ticks;
+  cur->wakeup_tick = wake;
 
   /* Insert current thread into sleep_list ordered by wakeup_tick. */
   list_insert_ordered (&sleep_list, &cur->sleep_elem, wakeup_less, NULL);
@@ -194,15 +192,12 @@ static void
 timer_interrupt (struct intr_frame *args UNUSED)
 {
   ticks++;
-  thread_tick ();
 
-  enum intr_level old_level = intr_disable();
   /* Wake up any sleeping threads whose time has come. */
   while (!list_empty (&sleep_list)) 
     {
-      //struct list_elem *e = list_front (&sleep_list);
-      //struct thread *t = list_entry (e, struct thread, sleep_elem);
-      struct thread *t = list_entry(list_front(&sleep_list), struct thread, sleep_elem);
+      struct list_elem *e = list_front (&sleep_list);
+      struct thread *t = list_entry (e, struct thread, sleep_elem);
 
       if (t->wakeup_tick > ticks)
         break;   /* The earliest one hasn’t reached its time yet. */
@@ -210,7 +205,8 @@ timer_interrupt (struct intr_frame *args UNUSED)
       list_pop_front (&sleep_list);
       thread_unblock (t);
     }
-    intr_set_level(old_level);
+
+  thread_tick ();
 }
 /* Returns true if LOOPS iterations waits for more than one timer
    tick, otherwise false. */
@@ -283,14 +279,12 @@ real_time_delay (int64_t num, int32_t denom)
   busy_wait (loops_per_tick * num / 1000 * TIMER_FREQ / (denom / 1000)); 
 }
 /* Compare two threads by wakeup_tick (earlier wakeup first). */
-bool
+static bool
 wakeup_less (const struct list_elem *a,
              const struct list_elem *b,
              void *aux UNUSED)
 {
   const struct thread *ta = list_entry (a, struct thread, sleep_elem);
   const struct thread *tb = list_entry (b, struct thread, sleep_elem);
-  
   return ta->wakeup_tick < tb->wakeup_tick;
 }
-
