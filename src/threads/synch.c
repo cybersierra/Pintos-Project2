@@ -74,9 +74,7 @@ sema_down (struct semaphore *sema)
   old_level = intr_disable ();
   while (sema->value == 0)
     {
-      list_insert_ordered (&sema->waiters,
-                           &thread_current ()->elem,
-                           thread_priority_higher, NULL);
+      list_insert_ordered(&sema->waiters, &thread_current()->elem, thread_priority_higher, NULL);
       thread_block ();
     }
   sema->value--;
@@ -118,31 +116,26 @@ sema_up (struct semaphore *sema)
 {
   enum intr_level old_level;
   struct thread *unblocked = NULL;
-  bool need_preempt = false;
+  bool need_yield  = false;
 
   ASSERT (sema != NULL);
+
   old_level = intr_disable ();
+  if(!list_empty (&sema->waiters)){
+    //struct thread *t = list_entry (list_pop_front (&sema->waiters), struct thread, elem);
+    list_sort(&sema->waiters, thread_priority_higher, NULL);
+    unblocked = list_entry (list_pop_front (&sema->waiters), struct thread, elem);
+    //struct thread *t = list_entry(list_pop_front (&sema->waiters), struct thread, elem);
+    thread_unblock (unblocked);
 
-  if (!list_empty (&sema->waiters))
-    {
-      /* Waiters are already priority-ordered by sema_down(). */
-      unblocked = list_entry (list_pop_front (&sema->waiters),
-                              struct thread, elem);
-      thread_unblock (unblocked);
-    }
-
+    if (unblocked->priority > thread_current ()->priority)
+      need_yield = true;
+  }
   sema->value++;
-
-  if (unblocked != NULL &&
-      unblocked->priority > thread_current ()->priority)
-    need_preempt = true;
-
   intr_set_level (old_level);
 
-  if (need_preempt) {
-    if (intr_context ()) intr_yield_on_return ();
-    else                 thread_yield ();
-  }
+  if (need_yield && !intr_context ())
+    thread_yield ();
 }
 
 
@@ -340,17 +333,19 @@ cond_sema_higher (const struct list_elem *a,
                   const struct list_elem *b,
                   void *aux UNUSED)
 {
-  struct semaphore_elem *sa = list_entry (a, struct semaphore_elem, elem);
-  struct semaphore_elem *sb = list_entry (b, struct semaphore_elem, elem);
+  const struct semaphore_elem *sa = list_entry (a, struct semaphore_elem, elem);
+  const struct semaphore_elem *sb = list_entry (b, struct semaphore_elem, elem);
 
-  struct list_elem *max_a = list_max (&sa->semaphore.waiters, thread_priority_higher, NULL);
-  struct list_elem *max_b = list_max (&sb->semaphore.waiters, thread_priority_higher, NULL);
+  // if a semaphore hase no waiters then it's lowest priority
+  if (list_empty (&sa->semaphore.waiters))
+    return false;
+  if (list_empty (&sb->semaphore.waiters))
+    return true;
 
   struct thread *ta = list_entry (list_front (&sa->semaphore.waiters),
                                   struct thread, elem);
   struct thread *tb = list_entry (list_front (&sb->semaphore.waiters),
                                   struct thread, elem);
-  
   return ta->priority > tb->priority;
 }
 
