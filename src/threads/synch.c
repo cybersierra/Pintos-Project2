@@ -353,10 +353,14 @@ cond_sema_higher (const struct list_elem *a,
   struct semaphore_elem *sa = list_entry (a, struct semaphore_elem, elem);
   struct semaphore_elem *sb = list_entry (b, struct semaphore_elem, elem);
 
+  struct list_elem *max_a = list_max (&sa->semaphore.waiters, thread_priority_higher, NULL);
+  struct list_elem *max_b = list_max (&sb->semaphore.waiters, thread_priority_higher, NULL);
+
   struct thread *ta = list_entry (list_front (&sa->semaphore.waiters),
                                   struct thread, elem);
   struct thread *tb = list_entry (list_front (&sb->semaphore.waiters),
                                   struct thread, elem);
+  
   return ta->priority > tb->priority;
 }
 
