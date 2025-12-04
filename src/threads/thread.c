@@ -298,8 +298,12 @@ thread_unblock (struct thread *t)
   // Decide about preemption AFTER we re-enable interrupts.
   intr_set_level (old_level);
 
-  if (!intr_context() && t->priority > thread_current()->priority)
-    thread_yield();
+  if (t->priority > thread_current()->priority){
+    if(intr_context())
+      intr_yield_on_return();
+    else
+      thread_yield();
+  }
 }
 
 /* Returns the name of the running thread. */
