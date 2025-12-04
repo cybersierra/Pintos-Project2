@@ -15,6 +15,8 @@
 #include "userprog/process.h"
 #endif
 
+// test
+
 /* Random value for struct thread's `magic' member.
    Used to detect stack overflow.  See the big comment at the top
    of thread.h for details. */
@@ -72,6 +74,7 @@ static void schedule (void);
 void thread_schedule_tail (struct thread *prev);
 static tid_t allocate_tid (void);
 
+#if 0
 /* Higher number, higher priority (Added) */
 bool
 thread_priority_higher (const struct list_elem *a, const struct list_elem *b, void *aux UNUSED) {
@@ -79,7 +82,7 @@ thread_priority_higher (const struct list_elem *a, const struct list_elem *b, vo
   const struct thread *tb = list_entry (b, struct thread, elem);
   return ta->priority > tb->priority; 
 }
-
+#endif
 
 /* Order a thread’s donors by effective priority (higher first). */
 bool
@@ -281,11 +284,16 @@ thread_unblock (struct thread *t)
   old_level = intr_disable ();
   ASSERT (t->status == THREAD_BLOCKED);
 
-    /* Put T into ready_list in priority order (highest first). */
+  list_push_back (&ready_list,&t->elem);
+  t->status = THREAD_READY;
+  intr_set_level (old_level);
+
+  /*
+  // Put T into ready_list in priority order (highest first).
   list_insert_ordered (&ready_list, &t->elem, thread_priority_higher, NULL);
   t->status = THREAD_READY;
 
-  /* Decide about preemption AFTER we re-enable interrupts. */
+  // Decide about preemption AFTER we re-enable interrupts.
   bool preempt = (t->priority > thread_current ()->priority);
   intr_set_level (old_level);
 
@@ -293,6 +301,7 @@ thread_unblock (struct thread *t)
     if (intr_context()) intr_yield_on_return();
     else thread_yield();
   }
+  */
 }
 
 /* Returns the name of the running thread. */
@@ -368,6 +377,7 @@ thread_yield (void)
   intr_set_level (old_level);
 }
 
+#if 0
 /* If T is in READY state, reposition it in ready_list by priority. */
 void
 thread_ready_reinsert(struct thread *t)
@@ -380,7 +390,7 @@ thread_ready_reinsert(struct thread *t)
   }
   intr_set_level (old);
 }
-
+#endif
 
 /* Invoke function 'func' on all threads, passing along 'aux'.
    This function must be called with interrupts off. */
@@ -403,6 +413,8 @@ thread_foreach (thread_action_func *func, void *aux)
 void
 thread_set_priority (int new_priority) 
 {
+  thread_current ()->priority = new_priority;
+  #if 0
   struct thread *cur = thread_current ();
 
   /* Update base priority, then recompute effective priority. */
@@ -416,7 +428,9 @@ thread_set_priority (int new_priority)
       list_entry (list_front (&ready_list), struct thread, elem);
     if (top->priority > cur->priority)
       thread_yield ();
+    
   }
+  #endif
 }
 
 /* Returns the current thread's priority. */
