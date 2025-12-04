@@ -7,7 +7,6 @@
 #include "threads/interrupt.h"
 #include "threads/synch.h"
 #include "threads/thread.h"
-#include <list.h>
   
 /* See [8254] for hardware details of the 8254 timer chip. */
 
@@ -32,16 +31,12 @@ static void real_time_sleep (int64_t num, int32_t denom);
 static void real_time_delay (int64_t num, int32_t denom);
 static bool wakeup_less(const struct list_elem *a, const struct list_elem *b, void *aux);
 
-/* List of sleeping threads (ordered by wakeup_tick). */
-static struct list sleep_list;
-
 /* Sets up the timer to interrupt TIMER_FREQ times per second,
    and registers the corresponding interrupt. */
 void
 timer_init (void) 
 {
   pit_configure_channel (0, 2, TIMER_FREQ);
-  list_init (&sleep_list);  /* init global sleep list */
   intr_register_ext (0x20, timer_interrupt, "8254 Timer");
 }
 
@@ -92,13 +87,10 @@ timer_elapsed (int64_t then)
 
 /* Sleeps for approximately TICKS timer ticks.  Interrupts must
    be turned on. */
-/* Sleeps for approximately TICKS timer ticks.  Interrupts must
-   be turned on. */
 void
 timer_sleep (int64_t ticks) 
 {
-  if (ticks <= 0)
-    return;
+  int64_t start = timer_ticks ();
 
   ASSERT (intr_get_level () == INTR_ON);
 
@@ -116,6 +108,7 @@ timer_sleep (int64_t ticks)
 
   intr_set_level (old_level);
 }
+
 /* Sleeps for approximately MS milliseconds.  Interrupts must be
    turned on. */
 void
@@ -187,27 +180,13 @@ timer_print_stats (void)
 }
 
 /* Timer interrupt handler. */
-/* Timer interrupt handler. */
 static void
 timer_interrupt (struct intr_frame *args UNUSED)
 {
   ticks++;
-
-  /* Wake up any sleeping threads whose time has come. */
-  while (!list_empty (&sleep_list)) 
-    {
-      struct list_elem *e = list_front (&sleep_list);
-      struct thread *t = list_entry (e, struct thread, sleep_elem);
-
-      if (t->wakeup_tick > ticks)
-        break;   /* The earliest one hasn’t reached its time yet. */
-
-      list_pop_front (&sleep_list);
-      thread_unblock (t);
-    }
-
   thread_tick ();
 }
+
 /* Returns true if LOOPS iterations waits for more than one timer
    tick, otherwise false. */
 static bool

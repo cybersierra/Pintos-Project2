@@ -100,10 +100,6 @@ struct thread
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
 
-    /* Sleep support. */
-    int64_t wakeup_tick;        /* Tick at which to wake up (timer_sleep). */
-    struct list_elem sleep_elem;/* List element for global sleep list. */
-
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
     uint32_t *pagedir;                  /* Page directory. */
