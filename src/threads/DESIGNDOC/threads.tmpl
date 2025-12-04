@@ -158,9 +158,19 @@ Condition Variables: Each waiting thread has an associated semaphore and are sto
 >> B4: Describe the sequence of events when a call to lock_acquire()
 >> causes a priority donation.  How is nested donation handled?
 
+First T sets waiting_lock = L then if T's priority is higher than H then T is added to the donations list and 
+H's priority is raised. If H is waiting on another lock then it follows H's waiting_lock pointer 
+and repeats the donation process. This can naturally handle the nested donation. After donation is complete then T 
+calls sema_down() and aquires the lock then clears waiting_lock and adds the lock to its list.
 
 >> B5: Describe the sequence of events when lock_release() is called
 >> on a lock that a higher-priority thread is waiting for.
+
+First releasing thread removes the lock from its list and any donations in its donations list 
+that came from threads waiting on this lock are removed. Then the thread's priorty get recomputed as 
+the maximum of its base_priority and any remaining donations. Then sema_up() is called on the lock's semaphore. After the wake-up 
+of the highest priorty waiting thread if the unblocked threat has a high priority than the releasing thread,
+then that thread yields to allow immediate preemption.
 
 ---- SYNCHRONIZATION ----
 
@@ -168,10 +178,20 @@ Condition Variables: Each waiting thread has an associated semaphore and are sto
 >> how your implementation avoids it.  Can you use a lock to avoid
 >> this race?
 
+A race can occur in thread_set_priority() if the thread changes its priority at the same time the scheduler is modifying either 
+the ready_list or the donation list. To prevent corruption we can disable interrupts while updating the thread's priorty and 
+decides whether or not it should yield. With the interrupts off no scheduling code can run during this operation. 
+We can't use a lock here because locks may cause a block and blocking isn't avaiable while modifying scheduler data.
+
 ---- RATIONALE ----
 
 >> B7: Why did you choose this design?  In what ways is it superior to
 >> another design you considered?
+
+This design was chosen because it is simple and best matches the Pintos structure. 
+By keeping the ready_list and waiter lists sorted by priority it makes it easier to run and wake up the highest-priority thread.
+Also, using interrupt disabling for scheduler data matches the existing code and is able to avoid sleeping. This design is more superior 
+to other designs because this one wasn't as complex or harder and focuses more on efficiency.
 
 			  ADVANCED SCHEDULER
 			  ==================
