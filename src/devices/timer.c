@@ -30,6 +30,7 @@ static bool too_many_loops (unsigned loops);
 static void busy_wait (int64_t loops);
 static void real_time_sleep (int64_t num, int32_t denom);
 static void real_time_delay (int64_t num, int32_t denom);
+static bool wakeup_less (const struct list_elem *a, const struct list_elem *b, void *aux);
 
 /* List of sleeping threads (ordered by wakeup_tick). */
 static struct list sleep_list;
@@ -106,6 +107,8 @@ timer_sleep (int64_t ticks)
   int64_t wake = timer_ticks () + ticks;
   struct thread *cur = thread_current ();
   cur->wakeup_tick = wake;
+
+  printf("DEBUG: %s sleeping until %lld (now %lld)\n", cur->name, wake, timer_ticks());
 
   /* Insert current thread into sleep_list ordered by wakeup_tick. */
   list_insert_ordered (&sleep_list, &cur->sleep_elem, wakeup_less, NULL);
@@ -203,6 +206,7 @@ timer_interrupt (struct intr_frame *args UNUSED)
         break;   /* The earliest one hasn’t reached its time yet. */
 
       list_pop_front (&sleep_list);
+      printf("DEBUG: waking %s at tick %%lld\n", t->name, ticks);
       thread_unblock (t);
     }
 
