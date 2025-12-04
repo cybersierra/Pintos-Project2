@@ -34,8 +34,8 @@
 
 /* Order condvar waiters by the priority of the top waiter in each semaphore. */
 static bool
-cond_sema_higher (const struct list_elem *a,
-                  const struct list_elem *b,
+cond_sema_higher (struct list_elem *a,
+                  struct list_elem *b,
                   void *aux UNUSED);
 
 /* Initializes semaphore SEMA to VALUE.  A semaphore is a
@@ -116,7 +116,8 @@ sema_up (struct semaphore *sema)
 {
   enum intr_level old_level;
   struct thread *unblocked = NULL;
-  bool need_yield  = false;
+  //bool need_yield  = false;
+  bool need_preempt = false;
 
   ASSERT (sema != NULL);
 
@@ -130,19 +131,25 @@ sema_up (struct semaphore *sema)
     
     struct list_elem *max_elem = 
       list_max (&sema->waiters, thread_priority_higher, NULL);
+    
     list_remove (max_elem);
     unblocked = list_entry (max_elem, struct thread, elem);
     thread_unblock (unblocked);
     
 
     if (unblocked->priority > thread_current ()->priority)
-      need_yield = true;
+      need_preempt = true;
   }
   sema->value++;
   intr_set_level (old_level);
 
-  if (need_yield && !intr_context ())
-    thread_yield ();
+  if (need_preempt)
+    { 
+      if (int_context ())
+       intr_yield_on_return ();
+      else
+        thread_yield ();
+    }
 }
 
 
@@ -336,8 +343,8 @@ struct semaphore_elem
 /* Order condvar waiters by the priority of the top waiter
    in each embedded semaphore (higher first). */
 static bool
-cond_sema_higher (const struct list_elem *a,
-                  const struct list_elem *b,
+cond_sema_higher (struct list_elem *a,
+                  struct list_elem *b,
                   void *aux UNUSED)
 {
   const struct semaphore_elem *sa = list_entry (a, struct semaphore_elem, elem);
