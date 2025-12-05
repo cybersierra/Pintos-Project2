@@ -1,0 +1,218 @@
+			+--------------------+
+			|        CS 140      |
+			| PROJECT 1: THREADS |
+			|   DESIGN DOCUMENT  |
+			+--------------------+
+				   
+---- GROUP ----
+
+>> Fill in the names and email addresses of your group members.
+
+Adyson Rollins abrollins42@tntech.edu
+Jillian Wheeler jewheeler42@tntech.edu
+Sierra Stewart srstewart43@tntech.edu
+Kyle Davis kldavis48@tntech.edu
+
+---- PRELIMINARIES ----
+
+We used Pintos documentation and many of the course slideshows and notes for threads, etc.
+
+			     ALARM CLOCK
+			     ===========
+
+---- DATA STRUCTURES ----
+
+>> A1: Copy here the declaration of each new or changed `struct' or
+>> `struct' member, global or static variable, `typedef', or
+>> enumeration.  Identify the purpose of each in 25 words or less.
+
+New global variable in `devices/timer.c`:
+
+    /* List of sleeping threads. Ordered by wake_tick ascending. */
+    static struct list sleep_list;
+
+New helper struct in `devices/timer.c`:
+
+    /* Represents one sleeping thread and its wake-up time. */
+    struct sleep_elem {
+      int64_t wake_tick;        /* Absolute tick when thread should wake. */
+      struct thread *t;         /* Sleeping thread. */
+      struct list_elem elem;    /* List element for sleep_list. */
+    };
+
+
+---- ALGORITHMS ----
+
+>> A2: Briefly describe what happens in a call to timer_sleep(),
+>> including the effects of the timer interrupt handler.
+
+timer_sleep(ticks):
+Interrupts are disabled and the thread creates a sleep_elem struct which contains itself and the wake time. This struct is then inserted into a global
+sleep_list using list_insert_ordered() which sorts the lists by wake_tick. After the entry the thread executes thread_block() and places itself into 
+the blocked state without using any CPU time. The timer_interrupt runs every tick and after updating the tick counter it checks the front of sleep_list. With
+the list sorted any wake_tick <= the current tick is removed and unblocked from the list. These threads will then rejoin the queue and preempt the running thread if they have higher priority. By this design it can avoid busy waiting.
+
+
+>> A3: What steps are taken to minimize the amount of time spent in
+>> the timer interrupt handler?
+
+Within timer_sleep() we can compute the absolute wake-up tick then insert a sleep_elem into our sleep_list which is then ordered.
+With this ordered list they interrupt only have to look at the front of the list to find the threads it needs to wake.
+In timer_interrupt() each tick increments the global tick counter and will continue to check the front of the list checking if the wake_tick <= the current tick.
+If the wake_tick is greater than we can stop and dont have to worry about the rest of the list. No big operations are performed inside the interrupt handler, all sorting and computation is done within the thread context. In this way, the interrupt handler's work per tick is only proportional to the number of threads that actuall need to wake up at 
+that tick.
+
+
+---- SYNCHRONIZATION ----
+
+>> A4: How are race conditions avoided when multiple threads call
+>> timer_sleep() simultaneously?
+
+In timer_sleep(), the it disables interrupts before computing the wake-up tick, insert sleep_elem into sleep_list, and call thread_block(). After the thread has been blocked the list operations can be completed and the previous interrupt level is restored. timer_interrupt() also runs with interrupts disabled by default. It also traverses and
+modifies sleep_list only when waking threads. Due to Pintos being a single-CPU, disabling interrupts prevents the timer interupt from preempting timer_sleep() in the middle of changing sleep_list. It also prevents anything else from changing the list at the same time. We cannot use a lock to protect sleep_list because it may cause the caller to sleep and may not be used safely in interrupt context.
+
+>> A5: How are race conditions avoided when a timer interrupt occurs
+>> during a call to timer_sleep()?
+
+Race conditions can be avoided when a timer interrupt happens by disabling interrupts. Using timer_sleep() the thread is able to disable interrupts before computing the wake_up tick which creates its sleep_elem. After the sleep_elem is inserted into sleep_list and calls thread_block(). Due to interrupts being disabled during this, the timer interrupt cannot happen in the middle of this operation. The interrupts are then enabled after thread_block().
+
+---- RATIONALE ----
+
+>> A6: Why did you choose this design?  In what ways is it superior to
+>> another design you considered?
+
+By using a sorted sleep list with blocking all the big work is integrated into timer_sleep(). This keeps the timer interrupt handler to work quicker and maintain an ordered sleep_list the allowed the handler to only have to look at the front of the list. This design also avoid busy waiting by blocking threads while sleeping and avoids consuming CPU time. All sorting and calculationns are done within the thread context and the interrupt handler only preforms removals and thread_unblock() calls. This design is superior because it involves the handler to not have to scan all the threads.
+
+			 PRIORITY SCHEDULING
+			 ===================
+
+---- DATA STRUCTURES ----
+
+>> B1: Copy here the declaration of each new or changed `struct' or
+>> `struct' member, global or static variable, `typedef', or
+>> enumeration.  Identify the purpose of each in 25 words or less.
+
+1. In struct thread (threads/thread.h):
+
+int base_priority;
+    The thread’s original priority before any donations.
+
+int priority;
+    The thread’s current effective priority including donations.
+
+struct list donations;
+    List of threads that have donated priority to this thread.
+
+struct list_elem donation_elem;
+    List element used when this thread is in another thread’s donations list.
+
+struct lock *waiting_lock;
+    Lock that this thread is currently waiting on (if any). Used to track nested donation chains. 
+
+struct list locks;
+        Locks currently held by this thread. Needed to recalculate priority when releasing a lock.
+
+2. Ready list (threads/thread.c):
+
+static struct list ready_list;
+    Ready queue of runnable threads, now kept sorted by priority (highest first) instead of FIFO.
+
+3. Priority comparator (threads/thread.c):
+
+bool thread_priority_cmp(const struct list_elem *a, const struct list_elem *b, void *aux);
+    Comparator function used to keep ready_list, semaphore waiters, and condition variable waiters sorted by priority.
+
+
+4. In struct lock (threads/synch.h):
+
+struct list_elem elem;
+    Allows a lock to be stored in the thread’s list of held locks. Required for proper priority recalculation on release.
+
+>> B2: Explain the data structure used to track priority donation.
+>> Use ASCII art to diagram a nested donation.  (Alternately, submit a
+>> .png file.)
+
+- base_priority: the thread’s original priority.
+- priority: the effective priority after donations.
+- waiting_lock: the lock the thread is currently blocked on.
+- locks: the list of locks the thread is holding.
+- donations: the list of threads that have donated priority to this thread.
+- donation_elem: list element used inside another thread’s donations list.
+
+H (63) --waiting on--> [lock_A] --held by--> M (40 → 63)
+											|
+											v
+					M --waiting on--> [lock_B] --held by--> L (20 → 63)
+
+
+---- ALGORITHMS ----
+
+>> B3: How do you ensure that the highest priority thread waiting for
+>> a lock, semaphore, or condition variable wakes up first?
+
+To make sure the highest-priority waiting thread wakes up first we kept all waiter lists priority-ordered.
+Semaphores: Threads were inserted into sema->waiters using list_insert_ordered(). In sema_up(), the front of list is popped which is always the highest-priority waiter and then calls thread_unblock() on it.
+Locks: lock_acquire() and lock_release() automatically follow the same ordered behavior using sema_down() and sema_up()
+Condition Variables: Each waiting thread has an associated semaphore and are stored in cond->waiters which also uses list_insert_ordered(). cond_signal() then removes the highest priority waiter then performs sema_up().
+
+>> B4: Describe the sequence of events when a call to lock_acquire()
+>> causes a priority donation.  How is nested donation handled?
+
+First T sets waiting_lock = L then if T's priority is higher than H then T is added to the donations list and 
+H's priority is raised. If H is waiting on another lock then it follows H's waiting_lock pointer 
+and repeats the donation process. This can naturally handle the nested donation. After donation is complete then T 
+calls sema_down() and aquires the lock then clears waiting_lock and adds the lock to its list.
+
+>> B5: Describe the sequence of events when lock_release() is called
+>> on a lock that a higher-priority thread is waiting for.
+
+First releasing thread removes the lock from its list and any donations in its donations list 
+that came from threads waiting on this lock are removed. Then the thread's priorty get recomputed as 
+the maximum of its base_priority and any remaining donations. Then sema_up() is called on the lock's semaphore. After the wake-up 
+of the highest priorty waiting thread if the unblocked threat has a high priority than the releasing thread,
+then that thread yields to allow immediate preemption.
+
+---- SYNCHRONIZATION ----
+
+>> B6: Describe a potential race in thread_set_priority() and explain
+>> how your implementation avoids it.  Can you use a lock to avoid
+>> this race?
+
+A race can occur in thread_set_priority() if the thread changes its priority at the same time the scheduler is modifying either 
+the ready_list or the donation list. To prevent corruption we can disable interrupts while updating the thread's priorty and 
+decides whether or not it should yield. With the interrupts off no scheduling code can run during this operation. 
+We can't use a lock here because locks may cause a block and blocking isn't available while modifying scheduler data.
+
+---- RATIONALE ----
+
+>> B7: Why did you choose this design?  In what ways is it superior to
+>> another design you considered?
+
+This design was chosen because it is simple and best matches the Pintos structure. 
+By keeping the ready_list and waiter lists sorted by priority it makes it easier to run and wake up the highest-priority thread.
+Also, using interrupt disabling for scheduler data matches the existing code and is able to avoid sleeping. This design is superior 
+to other designs because this one wasn't as complex or harder and focuses more on efficiency.
+
+			   SURVEY QUESTIONS
+			   ================
+
+Answering these questions is optional, but it will help us improve the
+course in future quarters.  Feel free to tell us anything you
+want--these questions are just to spur your thoughts.  You may also
+choose to respond anonymously in the course evaluations at the end of
+the quarter.
+
+>> In your opinion, was this assignment, or any one of the three problems
+>> in it, too easy or too hard?  Did it take too long or too little time?
+
+>> Did you find that working on a particular part of the assignment gave
+>> you greater insight into some aspect of OS design?
+
+>> Is there some particular fact or hint we should give students in
+>> future quarters to help them solve the problems?  Conversely, did you
+>> find any of our guidance to be misleading?
+
+>> Do you have any suggestions for the TAs to more effectively assist
+>> students, either for future quarters or the remaining projects?
+
+>> Any other comments?
